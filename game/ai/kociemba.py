@@ -29,6 +29,10 @@ N_MOVES = 18
 # ходы фазы 2: U U2 U' R2 F2 D D2 D' L2 B2 (номера среди 18: грань*3 + четверти-1)
 P2_MOVES = (0, 1, 2, 4, 7, 9, 10, 11, 13, 16)
 P2_ONLY = frozenset(P2_MOVES)
+# Фаза 2 не длиннее 12: длинные фазы 2 дороги в поиске, а решение с ними почти всегда
+# короче находится через фазу 1 на ход-два длиннее (замер: 20 кубиков по 60 тыс. позиций -
+# в среднем 22,85 хода без предела, 21,45 с пределом 12 за то же время).
+P2_CAP = 12
 MOVE_NAMES = K.MOVE_NAMES
 
 
@@ -315,7 +319,7 @@ class Solver:
 
         def phase2(cp):
             depth1 = len(path)
-            limit = (len(best[0]) - 1 if best[0] is not None else max_length) - depth1
+            limit = min((len(best[0]) - 1 if best[0] is not None else max_length) - depth1, P2_CAP)
             if limit < 0:
                 return
             # рёбра U/D и среднего слоя после фазы 1: ход за ходом по списку из 12
