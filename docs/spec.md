@@ -1,6 +1,6 @@
 # CubeRubikAi: кубик Рубика, который собирает ИИ
 
-Игра из ИИ-Игротеки на Python. Общие правила — `C:\Work\PythonAiGames\docs\contract.md`, очередь — волна 5.
+Игра из ИИ-Игротеки на Python. Общие правила — `PythonAiGames/docs/contract.md` (соседняя папка), очередь — волна 5.
 
 ## 1. Что это
 
