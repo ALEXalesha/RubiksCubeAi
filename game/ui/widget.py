@@ -253,7 +253,10 @@ class GameWidget(QWidget):
     def apply_theme(self):
         c = theme.palette(self.ctx.theme)
         self.view.set_theme(c["bg"], c["select"])
-        # поля ввода в общей теме aikit нет - стиль здесь, в цвет темы
+        # погашенной главной кнопки и поля ввода в общей теме aikit нет - стиль здесь
+        self.setStyleSheet(
+            f"QPushButton#primary:disabled {{ background: {c['surface2']}; color: {c['muted']};"
+            f" border-color: {c['border']}; }}")
         self.notation.setStyleSheet(
             f"QLineEdit {{ background: {c['surface2']}; border: 1px solid {c['border']}; border-radius: 8px;"
             f" padding: 6px 10px; color: {c['text']}; }} QLineEdit:focus {{ border-color: {c['accent']}; }}")

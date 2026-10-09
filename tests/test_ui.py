@@ -158,7 +158,9 @@ def test_ai_solves_and_plays_the_solution(app, win):
     assert str(n) in g.status.text()
     g.step_back()
     assert wait(app, lambda: not g.view.animating())
-    assert not P3.is_solved(g.view.state) and g.solution["index"] == n - 1
+    last = P3.parse(g.solution["moves"][-1])
+    assert (g.view.state == P3.apply(P3.solved(), [last.inverse()])).all()
+    assert g.solution["index"] == n - 1
     g.step_forward()
     assert wait(app, lambda: not g.view.animating())
     assert P3.is_solved(g.view.state)
@@ -269,5 +271,21 @@ def test_close_stops_table_building_within_two_seconds(app, tmp_path):
     t0 = time.time()
     assert g.shutdown()
     assert time.time() - t0 < 2.0
+    assert not g.ai.busy()                 # потоки действительно остановлены
     w.close()
     assert os.path.exists(os.path.join(str(tmp_path / "fresh"), "window.json"))
+
+
+def test_step_back_undoes_exactly_the_last_move(app, win):
+    g = win.game
+    g.view.set_state(P3.apply(P3.solved(), "R U"))
+    g.ai_solve()
+    assert wait(app, lambda: g.solution is not None, 30)
+    assert g.solution["moves"] == ["U'", "R'"]
+    assert wait(app, lambda: g.solution["index"] == 2 and not g.view.animating(), 10)
+    g.step_back()
+    assert wait(app, lambda: not g.view.animating())
+    assert (g.view.state == P3.apply(P3.solved(), "R")).all()
+    g.step_back()
+    assert wait(app, lambda: not g.view.animating())
+    assert (g.view.state == P3.apply(P3.solved(), "R U")).all()

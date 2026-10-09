@@ -62,3 +62,21 @@ MUTANTS += [
     ("pocket: повёрнутый угол не ловится", PK, "    if sum(cc.co) % 3:\n        raise K.InvalidCube(\"twist\")",
      "    if False:\n        raise K.InvalidCube(\"twist\")", TP),
 ]
+V = "game/ui/cubeview.py"
+W = "game/ui/widget.py"
+TU = "tests/test_ui.py"
+MUTANTS += [
+    ("view: слой крутится против мыши", V, "q = 1 if r[rot_axis] > 0 else 3", "q = 3 if r[rot_axis] > 0 else 1", TU),
+    ("view: видны задние грани", V, "return area < 0", "return area > 0", TU),
+    ("view: тянуть за наклейку - вращать вид", V, '                    self.drag_mode = "turn"\n                    self.userTurn.emit(move)',
+     '                    pass', TU),
+    ("view: Shift не обращает ход", V, "            name += \"'\"", "            pass", TU),
+    ("widget: отмена повторяет ход", W, 'self.view.turn(move.inverse(), "undo")', 'self.view.turn(move, "undo")', TU),
+    ("widget: ход человека не сбрасывает решение ИИ", W,
+     "        if self.solution is not None:\n            self.drop_solution()\n        self.view.turn(move, \"user\")",
+     "        self.view.turn(move, \"user\")", TU),
+    ("widget: рекорд не пишется", W, 'save_json(self.ctx.file("records.json"), self.records)', "pass", TU),
+    ("widget: назад - вперёд", W, 'self.view.turn(move.inverse(), "back")', 'self.view.turn(move, "back")', TU),
+    ("widget: невозможный кубик отдаётся ИИ", W, "        if why:\n            self.set_status", "        if False:\n            self.set_status", TU),
+    ("widget: закрытие не ждёт потоки", W, "return self.ai.shutdown(2000)", "return True", TU),
+]
