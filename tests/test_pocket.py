@@ -14,11 +14,8 @@ P2 = C.Puzzle(2)
 
 
 @pytest.fixture(scope="session")
-def table(tmp_path_factory):
-    path = tmp_path_factory.mktemp("pocket") / "pocket.npz"
-    t = PK.Table.load_or_build(str(path))
-    assert path.exists() and PK.Table.load(str(path)) is not None
-    return t
+def table(pocket_table):
+    return pocket_table
 
 
 def test_distance_distribution_is_the_known_one(table):

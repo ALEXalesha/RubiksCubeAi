@@ -77,6 +77,7 @@ def build(progress=None):
             p, t = part // N_TWIST, part % N_TWIST
             cand = (pm[p] * N_TWIST + tm[t]).ravel()
             dist[cand[dist[cand] == 255]] = depth + 1
+            say(min(0.99, depth / 12), "2x2")
         depth += 1
         say(min(0.99, depth / 12), "2x2")
     if (dist == 255).any():

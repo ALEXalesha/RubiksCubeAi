@@ -21,13 +21,8 @@ NODES = 60_000
 
 
 @pytest.fixture(scope="session")
-def tables(tmp_path_factory):
-    path = tmp_path_factory.mktemp("koc") / "kociemba.npz"
-    steps = []
-    t = KO.Tables.load_or_build(str(path), progress=lambda f, s: steps.append(f))
-    assert steps[0] == 0.0 and steps[-1] == 1.0 and steps == sorted(steps)
-    assert path.exists()
-    return t
+def tables(koc_tables):
+    return koc_tables
 
 
 @pytest.fixture(scope="session")

@@ -132,7 +132,8 @@ class Tables:
 
     @classmethod
     def build(cls, progress=None):
-        """Посчитать все таблицы. progress(доля 0..1, подпись) - для окна."""
+        """Посчитать все таблицы. progress(доля 0..1, подпись) - для окна; зовётся часто,
+        и исключение из него прерывает построение (так окно закрывается быстро)."""
         say = progress or (lambda frac, text: None)
         mc = K.MOVE_CUBES
         a = {}
@@ -146,20 +147,31 @@ class Tables:
                                     for m in mc], 1)
         say(0.1, "permutations")
         p8 = all_perms(8)
-        a["cp_move"] = np.stack([perm_rank(p8[:, m.cp]) for m in mc], 1)
-        a["ud_move"] = np.stack([perm_rank(p8[:, np.array(mc[k].ep[:8])]) for k in P2_MOVES], 1)
+        cols = []
+        for m in mc:
+            cols.append(perm_rank(p8[:, m.cp]))
+            say(0.1, "permutations")
+        a["cp_move"] = np.stack(cols, 1)
+        cols = []
+        for k in P2_MOVES:
+            cols.append(perm_rank(p8[:, np.array(mc[k].ep[:8])]))
+            say(0.2, "permutations")
+        a["ud_move"] = np.stack(cols, 1)
         p4 = all_perms(4)
         a["slicep_move"] = np.stack([perm_rank(p4[:, np.array(mc[k].ep[8:]) - 8]) for k in P2_MOVES], 1)
         say(0.25, "phase 1")
         allm = np.arange(N_MOVES)
-        a["prune_twist_slice"] = bfs(a["twist_move"], a["slice_move"], SLICE_SOLVED, allm)
+        a["prune_twist_slice"] = bfs(a["twist_move"], a["slice_move"], SLICE_SOLVED, allm,
+                                     lambda: say(0.25, "phase 1"))
         say(0.45, "phase 1")
-        a["prune_flip_slice"] = bfs(a["flip_move"], a["slice_move"], SLICE_SOLVED, allm)
+        a["prune_flip_slice"] = bfs(a["flip_move"], a["slice_move"], SLICE_SOLVED, allm,
+                                    lambda: say(0.45, "phase 1"))
         say(0.65, "phase 2")
         p2 = np.arange(len(P2_MOVES))
-        a["prune_cp_slicep"] = bfs(a["cp_move"][:, list(P2_MOVES)], a["slicep_move"], 0, p2)
+        a["prune_cp_slicep"] = bfs(a["cp_move"][:, list(P2_MOVES)], a["slicep_move"], 0, p2,
+                                   lambda: say(0.65, "phase 2"))
         say(0.85, "phase 2")
-        a["prune_ud_slicep"] = bfs(a["ud_move"], a["slicep_move"], 0, p2)
+        a["prune_ud_slicep"] = bfs(a["ud_move"], a["slicep_move"], 0, p2, lambda: say(0.85, "phase 2"))
         say(1.0, "done")
         return cls(a)
 
@@ -204,9 +216,10 @@ class Tables:
         return t
 
 
-def bfs(move1, move2, start2, moves):
+def bfs(move1, move2, start2, moves, tick=None):
     """Расстояния до цели (первая координата 0, вторая start2) для всех пар координат.
-    move1[c, k], move2[c, k] - куда переходит координата от k-го хода из moves."""
+    move1[c, k], move2[c, k] - куда переходит координата от k-го хода из moves. tick()
+    зовётся после каждого куска: через него окно отменяет построение (исключением)."""
     n2 = move2.shape[0]
     total = move1.shape[0] * n2
     dist = np.full(total, 255, np.uint8)
@@ -221,6 +234,8 @@ def bfs(move1, move2, start2, moves):
             c1, c2 = part // n2, part % n2
             cand = (move1[c1][:, moves].astype(np.int64) * n2 + move2[c2][:, moves]).ravel()
             dist[cand[dist[cand] == 255]] = depth + 1
+            if tick is not None:
+                tick()
         depth += 1
     if (dist == 255).any():
         raise AssertionError("часть состояний недостижима - таблица ходов неверна")
