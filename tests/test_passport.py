@@ -49,3 +49,21 @@ def test_model_metadata_has_training_time():
     with open(passport_path(2), encoding="utf-8") as f:
         meta = json.load(f)
     assert meta["train_seconds"] > 0 and meta["steps"] > 0
+
+
+def test_net3_passport_is_honest():
+    d = load()
+    p = d["net3"]
+    assert p["count"] == 1000 and 0 <= p["solved"] <= 1000
+    table = d["net3_by_depth"]["table"]
+    shares = [table[k]["solved_share"] for k in sorted(table, key=int)]
+    assert shares == sorted(shares, reverse=True)          # чем глубже перемешано, тем реже
+    assert shares[0] == 1.0
+
+
+@pytest.mark.slow
+def test_net3_passport_recomputes():
+    p = load()["net3"]
+    for i in range(2):
+        row = PP.net_case((3, i, p["max_nodes"]))
+        assert row["length"] == p["lengths"][i]

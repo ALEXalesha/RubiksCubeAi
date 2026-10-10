@@ -77,5 +77,82 @@
   "train_steps": 5000,
   "mean_optimal": 8.76,
   "optimal_share": 0.821
+ },
+ "net3": {
+  "count": 1000,
+  "solved": 0,
+  "solved_share": 0.0,
+  "mean_length": null,
+  "median_length": null,
+  "max_length": null,
+  "mean_seconds": 1.554,
+  "lengths": [
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "max_nodes": 5000,
+  "weight": 0.6,
+  "batch": 64,
+  "seed_base": 20261010,
+  "wall_minutes": 27.0,
+  "workers": 1,
+  "date": "2026-10-10",
+  "train_hours": 0.99,
+  "train_steps": 6000
+ },
+ "net3_by_depth": {
+  "per_depth": 100,
+  "max_nodes": 5000,
+  "table": {
+   "3": {
+    "solved_share": 1.0,
+    "mean_length": 3
+   },
+   "5": {
+    "solved_share": 1.0,
+    "mean_length": 5
+   },
+   "7": {
+    "solved_share": 1.0,
+    "mean_length": 6.96
+   },
+   "10": {
+    "solved_share": 0.93,
+    "mean_length": 10.19
+   },
+   "13": {
+    "solved_share": 0.3,
+    "mean_length": 13
+   },
+   "16": {
+    "solved_share": 0.0,
+    "mean_length": null
+   },
+   "20": {
+    "solved_share": 0.0,
+    "mean_length": null
+   }
+  },
+  "wall_minutes": 8.5,
+  "workers": 1,
+  "date": "2026-10-10"
  }
 }

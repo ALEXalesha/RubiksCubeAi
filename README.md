@@ -28,7 +28,7 @@ Work in progress (0.1.0). Python, PySide6 and numpy; no pygame.
 | 3×3 | Kociemba two-phase algorithm: move and pruning tables in numpy (built once, about 20 s, then read from a file), IDA* search that keeps improving the solution | 1000 random cubes: all solved, 20.81 moves on average (at most 23), 1.37 s per cube |
 | 2×2 | Breadth-first search over all 3 674 160 positions | Optimal solutions, 8.76 moves on average, at most 11 |
 | 2×2 | Neural network that taught itself (DeepCubeA idea: value iteration, weighted A*), 0.46 h of training | 1000 random cubes: all solved, 8.95 moves on average, optimal in 82.1% of cases, 0.04 s |
-| 3×3 | The same network idea | Training in progress; the numbers will go into the passport honestly, even if worse than Kociemba |
+| 3×3 | The same network, 1 hour of training (6000 steps) | Scrambled by 3-7 moves: 100%; by 10: 93%; by 13: 30%; by 16 and more: 0%. Random cubes: 0 of 1000 within 5000 positions. Much weaker than Kociemba so far; training continues |
 | 3×3 | Layer-by-layer beginner method written as rules ("Learn" mode) | Any cube, about 160 moves, every step explained with the piece highlighted |
 | 4×4 | No solver yet | You solve it yourself |
 
