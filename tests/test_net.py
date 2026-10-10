@@ -44,7 +44,7 @@ class Const:
     n = 3
 
     def predict(self, states):
-        return np.asarray(states)[:, 0].astype(np.float32)
+        return np.asarray(states)[:, 0].astype(np.float32) + 5.0
 
 
 def test_targets_follow_the_bellman_formula():
@@ -55,7 +55,7 @@ def test_targets_follow_the_bellman_formula():
     assert y[0] == 0.0
     assert y[1] == 1.0                                 # сосед R' собран - оценка 0
     children = s[2][perms]
-    expect = 1 + min(0.0 if pz.is_solved(c) else float(c[0]) for c in children)
+    expect = 1 + min(0.0 if pz.is_solved(c) else float(c[0]) + 5.0 for c in children)
     assert y[2] == expect
 
 
@@ -78,6 +78,7 @@ def test_astar_with_net_solves_and_respects_node_limit(tiny):
     s = pz.apply(pz.solved(), "R U' F2")
     r = astar.solve(tiny.net, s, max_nodes=5000)
     assert r.solved and pz.is_solved(pz.apply(s, r.moves))
+    assert r.depth == len(r.moves)
     assert r.nodes <= 5000 + 64
     hard = pz.apply(pz.solved(), "R U F' R2 U' F R' U2 F' R U'")
     r = astar.solve(tiny.net, hard, max_nodes=64, batch=16)
@@ -104,7 +105,7 @@ def test_astar_with_exact_heuristic_is_optimal(pocket_table):
     states, _ = davi.scrambled_batch(2, perms, rng, 10, 12, kmin=8)
     for s in states:
         r = astar.solve(Oracle(pocket_table), s, weight=1.0, batch=1)
-        assert r.solved and len(r.moves) == pocket_table.distance_of_state(s)
+        assert r.solved and len(r.moves) == pocket_table.distance_of_state(s) == r.depth
 
 
 def test_snapshot_resume_continues_exactly(tmp_path):

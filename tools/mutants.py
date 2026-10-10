@@ -80,3 +80,18 @@ MUTANTS += [
     ("widget: невозможный кубик отдаётся ИИ", W, "        if why:\n            self.set_status", "        if False:\n            self.set_status", TU),
     ("widget: закрытие не ждёт потоки", W, "return self.ai.shutdown(2000)", "return True", TU),
 ]
+DV = "game/train/davi.py"
+AS = "game/ai/astar.py"
+NT = "game/ai/net.py"
+TN = "tests/test_net.py"
+MUTANTS += [
+    ("davi: цель без +1", DV, "y = 1.0 + h.reshape(b, len(perms)).min(1)", "y = h.reshape(b, len(perms)).min(1)", TN),
+    ("davi: цель по максимуму", DV, "y = 1.0 + h.reshape(b, len(perms)).min(1)",
+     "y = 1.0 + h.reshape(b, len(perms)).max(1)", TN),
+    ("davi: собранный сосед не ноль", DV, "    h[is_solved_batch(children)] = 0.0\n", "", TN),
+    ("davi: целевая сеть не обновляется", DV, "            self.target.copy_from(self.net)", "            pass", TN),
+    ("davi: снимок без Adam", DV, "            self.opt.m[i][...] = arrays[f\"adam.m.{i}\"]", "            pass", TN),
+    ("astar: g не растёт", AS, "            g = g_of[src] + 1", "            g = g_of[src]", TN),
+    ("astar: путь не тем ходом", AS, "            parent[k] = (src, j % len(moves))", "            parent[k] = (src, j // len(moves))", TN),
+    ("net: вход с центрами", NT, "    if n % 2 == 1:", "    if False:", TN),
+]

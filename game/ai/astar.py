@@ -15,8 +15,9 @@ from game.core import cube as C
 
 
 class SearchResult:
-    def __init__(self, moves, nodes, seconds, estimate):
+    def __init__(self, moves, nodes, seconds, estimate, depth=None):
         self.moves = moves              # Move или None, если не нашла
+        self.depth = depth              # g собранной позиции - должно совпасть с длиной пути
         self.nodes = nodes
         self.seconds = seconds
         self.estimate = estimate        # оценка сети для начальной позиции
@@ -88,4 +89,4 @@ def solve(net, state, weight=0.6, batch=64, max_nodes=50_000, time_limit=None, s
         k, mi = parent[k]
         path.append(moves[mi])
     path.reverse()
-    return SearchResult(path, nodes, seconds, h0)
+    return SearchResult(path, nodes, seconds, h0, g_of[solved_key])
