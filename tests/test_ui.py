@@ -328,3 +328,38 @@ def test_network_solver_in_the_window(app, win, tiny_net2, monkeypatch):
     g.request_thoughts()
     assert wait(app, lambda: RU["th_net"].split("~")[0] in g.thoughts_label.text(), 30)
     g.change("solver", "kociemba")
+
+
+def test_learn_mode_walks_through_the_layers(app, win):
+    g = win.game
+    g.scramble(seed=21)
+    g.set_mode("learn")
+    assert g.learn_box.isVisible() and RU["learn_start"] in g.learn_label.text()
+    seen_steps = set()
+    for _ in range(40):
+        if g.view.pz.is_solved(g.view.state):
+            break
+        g.learn_next()
+        text = g.learn_label.text()
+        step = next(k for k in ("cross", "corners", "middle", "ycross", "yedges", "ycorners", "yorient")
+                    if RU["step_" + k] in text)
+        seen_steps.add(step)
+        if step in ("cross", "corners", "middle"):
+            assert g.view.highlight                     # нужный кубик подсвечен
+        assert wait(app, lambda: not g.view.animating())
+    assert g.view.pz.is_solved(g.view.state)
+    assert {"cross", "corners", "middle", "yorient"} <= seen_steps
+    assert RU["learn_done"].split(":")[0] in g.learn_label.text()
+
+
+def test_learn_mode_replans_after_a_user_move(app, win):
+    g = win.game
+    g.scramble(seed=22)
+    g.set_mode("learn")
+    g.learn_next()
+    assert wait(app, lambda: not g.view.animating())
+    g.on_user_turn(P3.parse("U"))
+    assert wait(app, lambda: not g.view.animating())
+    g.learn_next()
+    assert g.lesson["index"] == 1                       # план построен заново с начала
+    assert wait(app, lambda: not g.view.animating())

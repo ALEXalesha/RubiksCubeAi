@@ -79,6 +79,17 @@ def main(argv):
         app.processEvents()
         time.sleep(0.01)
     shot("preview_2x2.png")
+    g.set_size(3)
+    g.change("show_thoughts", False)
+    g.scramble(seed=31)
+    g.set_mode("learn")
+    for _ in range(5):
+        g.learn_next()
+        g.view.finish_all()
+    g.learn_next()
+    g.view.finish_all()
+    shot("preview_learn.png")
+    g.set_mode("self")
     g.set_size(4)
     g.scramble(seed=4)
     g.view.yaw, g.view.pitch = -28, 32

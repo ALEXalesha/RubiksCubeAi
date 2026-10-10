@@ -23,9 +23,10 @@ from aikit import settings as st
 from aikit import theme
 from aikit.storage import load_json, save_json
 from aikit.widgets import button, card, label, restyle, segmented
-from game.ai import solvers
+from game.ai import beginner, solvers
 from game.ai.solvers import Brain, Cancelled, NotFound
 from game.core import cube as C
+from game.core import cubie as K
 from game.core.cubie import InvalidCube
 from game.ui.ai_thread import AiController
 from game.ui.cubeview import CubeView
@@ -36,7 +37,7 @@ SIZES = (2, 3, 4)
 SCRAMBLE_LEN = {2: 11, 3: 25, 4: 40}
 SCHEMA = {
     "size": (3, st.choice(*SIZES)),
-    "mode": ("self", st.choice("self", "ai")),
+    "mode": ("self", st.choice("self", "ai", "learn")),
     "turn_ms": (180, st.int_range(0, 800)),
     "show_thoughts": (False, st.boolean()),
     "solver": ("kociemba", st.choice("kociemba", "net")),
@@ -69,6 +70,8 @@ class GameWidget(QWidget):
         self.history = []                # ходы человека после перемешивания (для отмены)
         self.timing = None               # {"start", "moves"} - идёт время сборки
         self.solution = None             # {"moves", "index", "playing", "start", "info"}
+        self.lesson = None               # {"plan", "index", "expect"} - режим «Учусь»
+        self.learn_text = ""
         self.status_key = ("app_sub", {})
         self.thought_text = ""
         self.hint_move = None
@@ -146,7 +149,7 @@ class GameWidget(QWidget):
         self.captions = {}
         w, self.size_buttons = segmented({n: f"{n}×{n}" for n in SIZES}, self.set_size)
         row(w, "size")
-        w, self.mode_buttons = segmented({"self": "", "ai": ""}, self.set_mode)
+        w, self.mode_buttons = segmented({"self": "", "ai": "", "learn": ""}, self.set_mode)
         col.addWidget(w)
         self.solver_row = QWidget()
         sl = QHBoxLayout(self.solver_row)
@@ -201,6 +204,16 @@ class GameWidget(QWidget):
         self.solution_label.setTextFormat(Qt.TextFormat.RichText)
         pl.addWidget(self.solution_label)
         col.addWidget(self.player)
+
+        self.learn_box = QWidget()
+        ll = QVBoxLayout(self.learn_box)
+        ll.setContentsMargins(0, 0, 0, 0)
+        ll.setSpacing(6)
+        self.learn_button = button("", "primary", self.learn_next)
+        ll.addWidget(self.learn_button)
+        self.learn_label = label("", None, wrap=True)
+        ll.addWidget(self.learn_label)
+        col.addWidget(self.learn_box)
 
         self.speed_caption = label("", "muted")
         col.addWidget(self.speed_caption)
@@ -280,6 +293,8 @@ class GameWidget(QWidget):
             cap.setText(t(key))
         self.mode_buttons["self"].setText(t("mode_self"))
         self.mode_buttons["ai"].setText(t("mode_ai"))
+        self.mode_buttons["learn"].setText(t("mode_learn"))
+        self.learn_button.setText(t("learn_next"))
         self.solver_caption.setText(t("solver"))
         self.solver_buttons["kociemba"].setText(t("kociemba"))
         self.solver_buttons["net"].setText(t("net"))
@@ -314,6 +329,9 @@ class GameWidget(QWidget):
         self.thoughts_box.blockSignals(False)
         ai = self.settings["mode"] == "ai"
         self.player.setVisible(ai)
+        learn = self.settings["mode"] == "learn"
+        self.learn_box.setVisible(learn)
+        self.learn_button.setEnabled(learn and self.n == 3 and not self.view.animating())
         self.undo_button.setEnabled(bool(self.history) and not ai)
         self.hint_button.setEnabled(self.brain.supports(self.n))
         self.solve_button.setEnabled(self.brain.supports(self.n))
@@ -352,6 +370,7 @@ class GameWidget(QWidget):
                 html.escape(self.t("step", i=sol["index"], n=len(sol["moves"]))) + "<br>" + " ".join(parts))
         else:
             self.solution_label.setText("")
+        self.learn_label.setText(self.learn_text)
         self.thoughts_label.setVisible(self.settings["show_thoughts"])
         self.thoughts_label.setText(self.thought_text)
         items = []
@@ -409,9 +428,63 @@ class GameWidget(QWidget):
         if self.settings["mode"] == mode:
             return
         self.settings.set("mode", mode)
-        if mode == "self":
+        if mode != "ai":
             self.pause()
-        self.sync_controls()
+        self.view.highlight = set()
+        self.view.update()
+        if mode == "learn":
+            self.lesson = None
+            self.timing = None
+            self.clock.stop()
+            self.status_key = ("app_sub", {})
+            self.learn_text = self.t("learn_start") if self.n == 3 else self.t("learn_only3")
+        self.refresh_texts()
+
+    # --- «Учусь»: послойный метод по шагам ---
+
+    def learn_next(self):
+        if self.n != 3 or self.view.animating():
+            return
+        state = self.view.state
+        ls = self.lesson
+        if ls is None or not (state == ls["expect"]).all():
+            if self.view.pz.is_solved(state):
+                self.learn_text = self.t("already")
+                self.refresh_texts()
+                return
+            why = self.brain.check(3, state)
+            if why:
+                self.set_status("invalid", why=self.t("why_" + why))
+                return
+            turn = beginner.white_down(state)
+            if turn and int(state[K.CENTERS[C.D]]) != C.U:
+                # сначала повернуть весь кубик белым вниз - дальше ходы как в учебнике
+                for m in self.view.pz.moves(turn):
+                    self.view.turn(m, "learn")
+                state = self.view.pz.apply(state, turn)
+            plan = beginner.plan(state, as_is=True)
+            ls = self.lesson = {"plan": plan, "index": 0, "expect": state.copy(), "colors": None}
+        plan = ls["plan"]
+        if ls["index"] >= len(plan.steps):
+            return
+        step, colors, moves = plan.steps[ls["index"]]
+        ls["index"] += 1
+        ls["colors"] = colors
+        t = self.t
+        lines = [t("learn_progress", i=beginner.STEPS.index(step) + 1, name=t("step_" + step)),
+                 t("explain_" + step)]
+        if colors:
+            lines.append(t("learn_piece", colors="-".join(t(f"color_{c}") for c in colors)))
+        lines.append(t("learn_moves", moves=" ".join(moves)) if moves else t("learn_skip"))
+        self.learn_text = "\n".join(lines)
+        self.view.highlight = beginner.piece_stickers(state, colors) if colors else set()
+        ls["expect"] = self.view.pz.apply(state, moves)
+        self.drop_solution()
+        for m in moves:
+            self.view.turn(m, "learn")
+        if ls["index"] >= len(plan.steps):
+            self.learn_text += "\n" + t("learn_done", n=len(plan.moves))
+        self.refresh_texts()
 
     # --- ходы человека ---
 
@@ -430,6 +503,9 @@ class GameWidget(QWidget):
                 self.timing["moves"] += 1
         if source in ("user", "undo", "custom"):
             self._invalidate()
+        if source == "learn" and not self.view.animating() and self.lesson and self.lesson.get("colors"):
+            self.view.highlight = beginner.piece_stickers(self.view.state, self.lesson["colors"])
+            self.view.update()
         if self.view.pz.is_solved(self.view.state) and not self.view.animating():
             self.on_solved(source)
         elif source == "user" and self.status_key[0] in ("solved", "solved_time", "solved_record", "already", "solution_done"):
