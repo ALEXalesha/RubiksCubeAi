@@ -363,3 +363,57 @@ def test_learn_mode_replans_after_a_user_move(app, win):
     g.learn_next()
     assert g.lesson["index"] == 1                       # план построен заново с начала
     assert wait(app, lambda: not g.view.animating())
+
+
+def click(app, widget, pos):
+    mouse(widget, "press", pos)
+    mouse(widget, "release", pos)
+    app.processEvents()
+
+
+def test_own_cube_editor_paints_and_checks(app, win):
+    from game.core import cubie as K
+    g = win.game
+    g.open_editor()
+    ed = g.editor
+    assert g.left.currentIndex() == 1
+    ed.resize(800, 600)
+    # повернуть угол URF на месте: три наклейки по кругу
+    a, b, c = K.CORNER_FACELET[0]
+    cols = [int(ed.state[i]) for i in (a, b, c)]
+    for idx, col in zip((a, b, c), (cols[1], cols[2], cols[0])):
+        click(app, ed, ed.swatch_rect(col).center())
+        click(app, ed, ed.sticker_rect(idx).center())
+    assert [int(ed.state[i]) for i in (a, b, c)] == [cols[1], cols[2], cols[0]]
+    assert not g.editor_accept()
+    assert RU["why_twist"] in g.editor_msg.text()
+    assert g.left.currentIndex() == 1                   # окно ждёт исправления
+    # центр не красится
+    center = K.CENTERS[0]
+    click(app, ed, ed.swatch_rect(C.R).center())
+    click(app, ed, ed.sticker_rect(center).center())
+    assert int(ed.state[center]) == C.U
+    # возможная раскраска - позиция после R U
+    target = P3.apply(P3.solved(), "R U")
+    ed.load(3, P3.solved())
+    for i in range(54):
+        if int(target[i]) != int(ed.state[i]):
+            click(app, ed, ed.swatch_rect(int(target[i])).center())
+            click(app, ed, ed.sticker_rect(i).center())
+    assert (ed.state == target).all()
+    assert g.editor_accept()
+    assert g.left.currentIndex() == 0
+    assert (g.view.state == target).all()
+    g.ai_solve()
+    assert wait(app, lambda: g.solution is not None, 30)
+    assert len(g.solution["moves"]) == 2
+
+
+def test_own_cube_editor_cancel_keeps_the_cube(app, win):
+    g = win.game
+    g.scramble(seed=4)
+    before = g.view.state.copy()
+    g.open_editor()
+    g.editor.state[0] = (int(g.editor.state[0]) + 1) % 6
+    g.close_editor()
+    assert (g.view.state == before).all()

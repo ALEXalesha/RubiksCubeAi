@@ -90,6 +90,12 @@ def main(argv):
     g.view.finish_all()
     shot("preview_learn.png")
     g.set_mode("self")
+    g.scramble(seed=8)
+    g.open_editor()
+    g.editor.state[20], g.editor.state[9] = g.editor.state[9], g.editor.state[20]
+    g.editor_accept()
+    shot("preview_editor.png")
+    g.close_editor()
     g.set_size(4)
     g.scramble(seed=4)
     g.view.yaw, g.view.pitch = -28, 32

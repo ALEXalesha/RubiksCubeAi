@@ -17,7 +17,7 @@ import time
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLineEdit, QScrollArea, QSlider,
-                               QVBoxLayout, QWidget)
+                               QStackedWidget, QVBoxLayout, QWidget)
 
 from aikit import settings as st
 from aikit import theme
@@ -31,6 +31,7 @@ from game.core.cubie import InvalidCube
 from game.ui.ai_thread import AiController
 from game.ui.cubeview import CubeView
 from game.ui.i18n import translator
+from game.ui.neteditor import NetEditor
 from game.version import VERSION
 
 SIZES = (2, 3, 4)
@@ -100,7 +101,10 @@ class GameWidget(QWidget):
         root.setSpacing(14)
         self.setObjectName("page")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        root.addWidget(self.view, 1)
+        self.left = QStackedWidget()
+        self.left.addWidget(self.view)
+        self.left.addWidget(self._editor_page())
+        root.addWidget(self.left, 1)
         root.addWidget(self._side())
 
         for keys, slot in (("Ctrl+Z", self.undo), ("Space", self.toggle_play), ("H", self.hint),
@@ -241,6 +245,8 @@ class GameWidget(QWidget):
         nrow.addWidget(self.apply_button)
         col.addLayout(nrow)
 
+        self.custom_button = button("", None, self.open_editor)
+        col.addWidget(self.custom_button)
         self.records_label = label("", "hint", wrap=True)
         col.addWidget(self.records_label)
         w, self.theme_buttons = segmented({"dark": "", "light": ""}, self.ctx.set_theme)
@@ -278,6 +284,7 @@ class GameWidget(QWidget):
     def apply_theme(self):
         c = theme.palette(self.ctx.theme)
         self.view.set_theme(c["bg"], c["select"])
+        self.editor.set_theme(c["bg"], c["text"], c["select"])
         # погашенной главной кнопки и поля ввода в общей теме aikit нет - стиль здесь
         self.setStyleSheet(
             f"QPushButton#primary:disabled {{ background: {c['surface2']}; color: {c['muted']};"
@@ -311,6 +318,11 @@ class GameWidget(QWidget):
         self.notation_caption.setText(t("notation"))
         self.notation.setPlaceholderText(t("notation_ph"))
         self.apply_button.setText(t("apply"))
+        self.custom_button.setText(t("custom_cube"))
+        self.editor_hint.setText(t("editor_hint"))
+        self.editor_done.setText(t("editor_done"))
+        self.editor_cancel.setText(t("editor_cancel"))
+        self.editor_solved.setText(t("editor_solved"))
         self.theme_buttons["dark"].setText(t("dark"))
         self.theme_buttons["light"].setText(t("light"))
         self.keys_label.setText(t("keys"))
@@ -485,6 +497,54 @@ class GameWidget(QWidget):
         if ls["index"] >= len(plan.steps):
             self.learn_text += "\n" + t("learn_done", n=len(plan.moves))
         self.refresh_texts()
+
+    # --- «Свой кубик» ---
+
+    def _editor_page(self):
+        page = QWidget()
+        col = QVBoxLayout(page)
+        col.setContentsMargins(0, 0, 0, 0)
+        self.editor = NetEditor()
+        col.addWidget(self.editor, 1)
+        self.editor_hint = label("", "muted", wrap=True)
+        col.addWidget(self.editor_hint)
+        self.editor_msg = label("", "statusLoss", wrap=True)
+        col.addWidget(self.editor_msg)
+        row = QHBoxLayout()
+        self.editor_solved = button("", None, lambda: self.editor.load(self.n, self.view.pz.solved()))
+        self.editor_cancel = button("", None, self.close_editor)
+        self.editor_done = button("", "primary", self.editor_accept)
+        row.addWidget(self.editor_solved)
+        row.addStretch(1)
+        row.addWidget(self.editor_cancel)
+        row.addWidget(self.editor_done)
+        col.addLayout(row)
+        return page
+
+    def open_editor(self):
+        self.view.finish_all()
+        self.editor.load(self.n, self.view.state)
+        self.editor_msg.setText("")
+        self.left.setCurrentIndex(1)
+
+    def close_editor(self):
+        self.left.setCurrentIndex(0)
+
+    def editor_accept(self):
+        state = self.editor.state.copy()
+        n = self.n
+        if n == 4:
+            import numpy as np
+            why = None if np.bincount(state, minlength=6).tolist() == [16] * 6 else "count"
+        else:
+            why = self.brain.check(n, state)
+        if why:
+            self.editor_msg.setText(self.t("invalid", why=self.t("why_" + why)))
+            return False
+        self.close_editor()
+        self._new_position(state)
+        self.set_status("custom")
+        return True
 
     # --- ходы человека ---
 

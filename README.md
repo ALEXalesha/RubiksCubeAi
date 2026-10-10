@@ -16,6 +16,7 @@ Work in progress (0.1.0). Python, PySide6 and numpy; no pygame.
 - **"I solve" mode:** scramble, a clock that starts with your first move, undo, a hint that highlights the layer to turn, records per cube size.
 - **"AI solves" mode:** the AI finds a solution in a background thread and plays it move by move: to start, back, pause, forward, turn speed.
 - **"Learn" mode:** the beginner layer-by-layer method in 7 steps; the AI turns the cube white side down, explains each step in words and highlights the piece being placed.
+- **"My own cube":** paint the stickers on an unfolded net; the program checks that such a cube can exist and says what is wrong if not.
 - **AI thoughts:** a lower and an upper bound for the moves left, how many positions were searched, how the solution got shorter during the search.
 - **Impossible cubes** are explained: a twisted corner, a flipped edge, two swapped pieces, wrong colors.
 - Dark and light themes, Russian and English, the window remembers its place.

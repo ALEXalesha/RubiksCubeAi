@@ -5,6 +5,10 @@ RU = {
     "app_title": "Кубик Рубика",
     "app_sub": "собери сам или посмотри, как собирает ИИ",
     "size": "Кубик", "mode": "Режим",
+    "custom_cube": "Свой кубик…",
+    "editor_hint": "Выберите цвет внизу и нажимайте на наклейки (можно протягивать). Центры не меняются: "
+                   "по ним видно, где какая грань.",
+    "editor_done": "Готово", "editor_cancel": "Отмена", "editor_solved": "Собранный",
     "mode_self": "Собираю сам", "mode_ai": "ИИ собирает", "mode_learn": "Учусь",
     "learn_next": "Следующий шаг", "learn_only3": "Учиться можно на кубике 3×3.",
     "learn_start": "Послойный метод: 7 шагов. Нажимайте «Следующий шаг» - ИИ объяснит и покажет.",
@@ -93,6 +97,10 @@ EN = {
     "app_title": "Rubik's Cube",
     "app_sub": "solve it yourself or watch the AI solve it",
     "size": "Cube", "mode": "Mode",
+    "custom_cube": "My own cube…",
+    "editor_hint": "Pick a color below and click the stickers (dragging works too). Centers stay fixed: "
+                   "they tell which face is which.",
+    "editor_done": "Done", "editor_cancel": "Cancel", "editor_solved": "Solved",
     "mode_self": "I solve", "mode_ai": "AI solves", "mode_learn": "Learn",
     "learn_next": "Next step", "learn_only3": "Learning works on the 3×3 cube.",
     "learn_start": "Layer by layer: 7 steps. Press \"Next step\" and the AI explains and shows each one.",
