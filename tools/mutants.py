@@ -95,3 +95,17 @@ MUTANTS += [
     ("astar: путь не тем ходом", AS, "            parent[k] = (src, j % len(moves))", "            parent[k] = (src, j // len(moves))", TN),
     ("net: вход с центрами", NT, "    if n % 2 == 1:", "    if False:", TN),
 ]
+BGF = "game/ai/beginner.py"
+TB = "tests/test_beginner.py"
+MUTANTS += [
+    ("beginner: угол вставляется не тем алгоритмом", BGF, 'INSERT_CORNER = "R U R\' U\'"', 'INSERT_CORNER = "R U R\'"', TB),
+    ("beginner: углы поворачиваются по одному R' D' R D", BGF, "            names += TWIST.split() * 2\n            cur = apply(cur, TWIST.split() * 2)",
+     "            names += TWIST.split()\n            cur = apply(cur, TWIST.split())", TB),
+    # «средний слой без проверки собранного» - равносильный: алгоритм, который ставит ребро e
+    # на его место, нацелен ровно на это место и соседние не трогает; проверка - страховка.
+    ("beginner: крест без уже поставленных рёбер", BGF, "emit(\"cross\", (\"edge\", e), cross_edge(cc, done))",
+     "emit(\"cross\", (\"edge\", e), cross_edge(cc, [e]))", TB),
+    ("beginner: цвета кубика из рабочей раскраски", BGF, "colors = tuple(int(original[c]) for c in table[j])",
+     "colors = tuple(int(c) for c in table[j])", TB),
+    ("beginner: угол над соседним местом", BGF, "        above = c - 4\n", "        above = (c - 3) % 4\n", TB),
+]
