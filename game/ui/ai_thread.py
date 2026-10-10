@@ -10,13 +10,36 @@ import time
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+# Потоки, не успевшие остановиться за shutdown() (машина перегружена): окно можно разрушать,
+# поток доработает до флага остановки сам и только потом удалится. Урок DurakAi 1.0.0:
+# разрушение окна с работающим дочерним QThread - qFatal и падение всей программы.
+_ORPHANS = []
+_UNDERTAKER = None
+
+
+class _Undertaker(QObject):
+    """Живёт в потоке окна: сигнал finished сироты приходит сюда очередью."""
+
+    def bury(self):
+        for j in list(_ORPHANS):
+            if j.isFinished():
+                j.wait()
+                _ORPHANS.remove(j)
+
+
+def _undertaker():
+    global _UNDERTAKER
+    if _UNDERTAKER is None:
+        _UNDERTAKER = _Undertaker()
+    return _UNDERTAKER
+
 
 class _Job(QThread):
     done = Signal(int, str, object)
     progress = Signal(int, float, str)
 
-    def __init__(self, token, kind, fn, parent=None):
-        super().__init__(parent)
+    def __init__(self, token, kind, fn):
+        super().__init__()
         self.token = token
         self.kind = kind
         self.fn = fn
@@ -44,15 +67,24 @@ class AiController(QObject):
 
     def start(self, token, kind, fn):
         self._reap()
-        job = _Job(token, kind, fn, self)
+        # без родителя: поток живёт, пока на него есть ссылка в self.jobs (или в _ORPHANS)
+        job = _Job(token, kind, fn)
         job.done.connect(self.ready)
         job.progress.connect(self.progress)
+        job.finished.connect(self._reap)
         self.jobs.append(job)
         job.start()
         return job
 
     def _reap(self):
-        self.jobs = [j for j in self.jobs if j.isRunning()]
+        """Кончившиеся потоки - из списка; последняя ссылка уходит, объект удаляется."""
+        alive = []
+        for j in self.jobs:
+            if j.isFinished():
+                j.wait()
+            elif j.isRunning():
+                alive.append(j)
+        self.jobs = alive
 
     def cancel(self, kind=None):
         for j in self.jobs:
@@ -71,4 +103,11 @@ class AiController(QObject):
             left = max(0, int((deadline - time.monotonic()) * 1000))
             j.wait(left)
         self._reap()
-        return not self.jobs
+        for j in self.jobs:
+            j.done.disconnect(self.ready)
+            j.progress.disconnect(self.progress)
+            _ORPHANS.append(j)
+            j.finished.connect(_undertaker().bury)
+        self.jobs = []
+        _undertaker().bury()
+        return not _ORPHANS

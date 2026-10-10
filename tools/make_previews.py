@@ -56,7 +56,7 @@ def main(argv):
         while g.solution is None and time.time() < end:
             app.processEvents()
             time.sleep(0.01)
-        g.pause()
+        g.pause_solution()
         for _ in range(len(g.solution["moves"]) // 2):
             g.step_forward()
         g.change("turn_ms", 400)

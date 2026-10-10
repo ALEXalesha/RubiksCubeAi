@@ -177,7 +177,7 @@ def test_user_turn_drops_the_ai_solution(app, win):
     g.scramble(seed=12)
     g.ai_solve()
     assert wait(app, lambda: g.solution is not None, 30)
-    g.pause()
+    g.pause_solution()
     g.on_user_turn(P3.parse("U"))
     assert g.solution is None
 
@@ -417,3 +417,42 @@ def test_own_cube_editor_cancel_keeps_the_cube(app, win):
     g.editor.state[0] = (int(g.editor.state[0]) + 1) % 6
     g.close_editor()
     assert (g.view.state == before).all()
+
+
+def test_widget_does_not_freeze_the_garbage_collector(app, win):
+    import gc
+    assert gc.get_freeze_count() == 0          # во вкладке оболочки заморозка была бы навсегда
+
+
+def test_pause_and_resume_for_the_shell(app, win):
+    g = win.game
+    g.change("turn_ms", 60)
+    g.scramble(seed=14)
+    g.ai_solve()
+    assert wait(app, lambda: g.solution is not None and g.solution["index"] >= 1, 30)
+    g.pause()
+    idx = g.solution["index"]
+    end = time.time() + 0.6
+    while time.time() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    assert g.solution["index"] == idx and not g.view.animating()
+    g.resume()
+    n = len(g.solution["moves"])
+    assert wait(app, lambda: g.solution["index"] == n and not g.view.animating(), 30)
+    assert P3.is_solved(g.view.state)
+
+
+def test_paused_time_is_not_counted(app, win):
+    g = win.game
+    moves = g.scramble(seed=15)
+    g.on_user_turn(C.inverse(moves)[0])
+    assert wait(app, lambda: not g.view.animating())
+    g.pause()
+    time.sleep(0.5)
+    g.resume()
+    for m in C.inverse(moves)[1:]:
+        g.on_user_turn(m)
+    assert wait(app, lambda: not g.view.animating())
+    spent = g.timing["end"] - g.timing["start"]
+    assert spent < 0.45

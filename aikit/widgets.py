@@ -1,4 +1,5 @@
-"""Общие виджеты: выпадающий список со своей стрелкой, подпись с переносом, кнопки.
+"""Общие виджеты: выпадающий список со своей стрелкой, подпись с переносом, кнопки,
+переключатели в ряд и сеткой.
 
 Две ловушки Qt, на которые уже наступали:
 
@@ -10,8 +11,9 @@
   рисует Combo.paintEvent: треугольник из рамок QSS Qt не умеет, выходит прямоугольник.
 """
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QPainter, QPolygonF
-from PySide6.QtWidgets import QButtonGroup, QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPolygonF
+from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
+                               QPushButton, QWidget)
 
 
 class Combo(QComboBox):
@@ -65,23 +67,69 @@ def button(text, name=None, slot=None):
     return b
 
 
-def segmented(options, slot):
-    """Ряд кнопок-переключателей: {значение: подпись}. Возвращает (виджет, {значение: кнопка})."""
+def segmented(options, slot, columns=None):
+    """Кнопки-переключатели: {значение: подпись}. Возвращает (виджет, {значение: кнопка}).
+    columns=None - в один ряд; число - сеткой в столько столбцов (в ряд не влезают).
+    Ширина кнопок - сразу под жирный текст (fit_segments); после смены надписей - снова."""
     box = QWidget()
-    row = QHBoxLayout(box)
-    row.setContentsMargins(0, 0, 0, 0)
-    row.setSpacing(6)
+    if columns:
+        lay = QGridLayout(box)
+    else:
+        lay = QHBoxLayout(box)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(6)
     group = QButtonGroup(box)
     group.setExclusive(True)
     buttons = {}
-    for value, text in options.items():
+    for i, (value, text) in enumerate(options.items()):
         b = button(text, "seg")
         b.setCheckable(True)
         b.clicked.connect(lambda _=False, v=value: slot(v))
         group.addButton(b)
-        row.addWidget(b)
+        if columns:
+            lay.addWidget(b, i // columns, i % columns)
+        else:
+            lay.addWidget(b)
         buttons[value] = b
+    fit_segments(buttons)
     return box, buttons
+
+
+def seg_grid(options, slot, cols=2):
+    """Переключатели сеткой (BlockDropAi) - то же, что segmented(..., columns=cols)."""
+    return segmented(options, slot, columns=cols)
+
+
+def fit_segments(*groups):
+    """Кнопки-переключатели шире жирного текста: выбранная кнопка пишется жирным (тема), а
+    ширину Qt считает по обычному шрифту - надпись обрезалась (2048Ai, BlockDropAi).
+    Звать после каждой смены надписей (язык). groups - словари {значение: кнопка} или
+    списки кнопок."""
+    for group in groups:
+        for b in (group.values() if isinstance(group, dict) else group):
+            # Шрифт - как в теме (14px), жирный с запасом: у кнопки при постройке ещё
+            # шрифт по умолчанию, тема применяется позже.
+            f = QFont(b.font())
+            f.setPixelSize(max(14, f.pixelSize()))
+            f.setWeight(QFont.Weight.Bold)
+            b.setMinimumWidth(QFontMetrics(f).horizontalAdvance(b.text()) + 30)
+
+
+fit_bold = fit_segments          # имя из BlockDropAi
+
+
+def regrid(box, buttons, columns):
+    """Переложить кнопки готового переключателя в сетку (2048Ai: боковая панель узкая).
+    Старая раскладка уходит во временный виджет и удаляется вместе с ним."""
+    old = box.layout()
+    for b in buttons.values():
+        old.removeWidget(b)                # кнопки остаются детьми box
+    QWidget().setLayout(old)
+    grid = QGridLayout(box)
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setSpacing(6)
+    for i, b in enumerate(buttons.values()):
+        grid.addWidget(b, i // columns, i % columns)
 
 
 def restyle(widget, object_name):

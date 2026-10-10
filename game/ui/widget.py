@@ -9,7 +9,6 @@
 Окно ему даёт оболочка (aikit.run_standalone или ИИ-Игротека). Тема и язык - из ctx, на
 лету по ctx.changed. Файлы - только в ctx.data_dir.
 """
-import gc
 import html
 import random
 import time
@@ -57,7 +56,6 @@ def fmt_clock(seconds):
 class GameWidget(QWidget):
     def __init__(self, ctx):
         super().__init__()
-        gc.freeze()
         self.ctx = ctx
         self.t = translator(ctx.lang)
         self.settings = st.Settings(SCHEMA, ctx.file("settings.json"))
@@ -72,6 +70,8 @@ class GameWidget(QWidget):
         self.timing = None               # {"start", "moves"} - идёт время сборки
         self.solution = None             # {"moves", "index", "playing", "start", "info"}
         self.lesson = None               # {"plan", "index", "expect"} - режим «Учусь»
+        self.hidden = False              # вкладка спрятана оболочкой (pause/resume)
+        self.was_playing = False
         self.learn_text = ""
         self.status_key = ("app_sub", {})
         self.thought_text = ""
@@ -412,6 +412,35 @@ class GameWidget(QWidget):
         self.view.stop_animation()
         return self.ai.shutdown(2000)
 
+    def pause(self):
+        """Оболочка спрятала вкладку: решение не крутится, время не идёт, ИИ не думает.
+        Кубик и решение ждут; поворот, что был в движении, доделывается сразу."""
+        if self.hidden:
+            return
+        self.hidden = True
+        self.was_playing = bool(self.solution and self.solution["playing"])
+        self.pause_solution()
+        self.thought_timer.stop()
+        self.thought_token += 1
+        self.ai.cancel("thoughts")
+        self.view.finish_all()
+        if self.timing and self.timing.get("start") is not None and self.timing.get("end") is None:
+            self.timing["paused_at"] = time.monotonic()
+        self.clock.stop()
+
+    def resume(self):
+        """Вкладку показали снова: всё идёт дальше с того же места (время паузы не считается)."""
+        if not self.hidden:
+            return
+        self.hidden = False
+        t = self.timing
+        if t and t.get("paused_at") is not None:
+            t["start"] += time.monotonic() - t.pop("paused_at")
+            self.clock.start()
+        if self.was_playing and self.solution:
+            self.toggle_play()
+        self.schedule_thoughts()
+
     def _invalidate(self):
         """Кубик стал другим: ответы ИИ на старый запрос не нужны."""
         self.token += 1
@@ -441,7 +470,7 @@ class GameWidget(QWidget):
             return
         self.settings.set("mode", mode)
         if mode != "ai":
-            self.pause()
+            self.pause_solution()
         self.view.highlight = set()
         self.view.update()
         if mode == "learn":
@@ -775,7 +804,7 @@ class GameWidget(QWidget):
         sol = self.solution
         if not sol or sol["index"] == 0:
             return
-        self.pause()
+        self.pause_solution()
         self.view.finish_all()
         sol["index"] -= 1
         move = self.view.pz.parse(sol["moves"][sol["index"]])
@@ -788,7 +817,7 @@ class GameWidget(QWidget):
         sol = self.solution
         if not sol:
             return
-        self.pause()
+        self.pause_solution()
         self.view.set_state(sol["start"])
         sol["index"] = 0
         self.set_status("solution", n=len(sol["moves"]))
@@ -799,7 +828,7 @@ class GameWidget(QWidget):
         if not sol:
             return
         if sol["playing"]:
-            self.pause()
+            self.pause_solution()
             return
         if sol["index"] >= len(sol["moves"]):
             return
@@ -807,7 +836,7 @@ class GameWidget(QWidget):
         self.refresh_texts()
         self.play_step()
 
-    def pause(self):
+    def pause_solution(self):
         if self.solution:
             self.solution["playing"] = False
         self.step_timer.stop()
@@ -822,6 +851,8 @@ class GameWidget(QWidget):
             self.thought_timer.start()
 
     def request_thoughts(self):
+        if self.hidden:
+            return
         if not self.settings["show_thoughts"] or self.view.animating():
             if self.settings["show_thoughts"]:
                 self.thought_timer.start()
