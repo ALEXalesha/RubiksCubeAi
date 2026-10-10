@@ -23,7 +23,8 @@ from aikit import settings as st
 from aikit import theme
 from aikit.storage import load_json, save_json
 from aikit.widgets import button, card, label, restyle, segmented
-from game.ai.solvers import Brain, Cancelled
+from game.ai import solvers
+from game.ai.solvers import Brain, Cancelled, NotFound
 from game.core import cube as C
 from game.core.cubie import InvalidCube
 from game.ui.ai_thread import AiController
@@ -38,9 +39,11 @@ SCHEMA = {
     "mode": ("self", st.choice("self", "ai")),
     "turn_ms": (180, st.int_range(0, 800)),
     "show_thoughts": (False, st.boolean()),
+    "solver": ("kociemba", st.choice("kociemba", "net")),
 }
 AI_TIME = 1.0               # секунд на поиск решения Kociemba (улучшение после первого)
 THOUGHT_TIME = 0.3
+NET_NODES = 20_000          # предел позиций для A* с сетью в окне
 AI_PAUSE_MS = 120           # пауза между ходами решения сверх анимации
 
 
@@ -145,6 +148,15 @@ class GameWidget(QWidget):
         row(w, "size")
         w, self.mode_buttons = segmented({"self": "", "ai": ""}, self.set_mode)
         col.addWidget(w)
+        self.solver_row = QWidget()
+        sl = QHBoxLayout(self.solver_row)
+        sl.setContentsMargins(0, 0, 0, 0)
+        self.solver_caption = label("", "muted")
+        sl.addWidget(self.solver_caption)
+        sl.addStretch(1)
+        w, self.solver_buttons = segmented({"kociemba": "", "net": ""}, lambda v: self.change("solver", v))
+        sl.addWidget(w)
+        col.addWidget(self.solver_row)
 
         self.status = label("", "section", wrap=True)
         self.status.setMinimumHeight(44)
@@ -268,6 +280,9 @@ class GameWidget(QWidget):
             cap.setText(t(key))
         self.mode_buttons["self"].setText(t("mode_self"))
         self.mode_buttons["ai"].setText(t("mode_ai"))
+        self.solver_caption.setText(t("solver"))
+        self.solver_buttons["kociemba"].setText(t("kociemba"))
+        self.solver_buttons["net"].setText(t("net"))
         self.scramble_button.setText(t("scramble"))
         self.reset_button.setText(t("reset"))
         self.undo_button.setText(t("undo"))
@@ -290,6 +305,8 @@ class GameWidget(QWidget):
     def sync_controls(self):
         self.size_buttons[self.n].setChecked(True)
         self.mode_buttons[self.settings["mode"]].setChecked(True)
+        self.solver_buttons[self.settings["solver"]].setChecked(True)
+        self.solver_row.setVisible(solvers.has_net(self.n))
         self.theme_buttons.get(self.ctx.theme, self.theme_buttons["dark"]).setChecked(True)
         self.lang_buttons[self.ctx.lang].setChecked(True)
         self.thoughts_box.blockSignals(True)
@@ -526,6 +543,11 @@ class GameWidget(QWidget):
         self._invalidate()
         self.drop_solution()
         self.set_status("thinking")
+        if self.settings["solver"] == "net" and solvers.has_net(self.n):
+            n, state = self.n, self.view.state.copy()
+            self.ai.start(self.token, "solve",
+                          lambda stop, progress: solvers.net_solve(n, state, NET_NODES, stop))
+            return
         self.ai.start(self.token, "solve", self._job("solve", AI_TIME))
 
     def hint(self):
@@ -555,6 +577,10 @@ class GameWidget(QWidget):
             return
         if isinstance(payload, Cancelled) or payload is None:
             return
+        if isinstance(payload, NotFound):
+            self.set_status("net_not_found", nodes=f"{payload.nodes:,}".replace(",", " "),
+                            est=f"{payload.estimate:.1f}")
+            return
         if isinstance(payload, Exception):
             self.set_status("error", e=payload)
             return
@@ -570,7 +596,11 @@ class GameWidget(QWidget):
         elif kind == "solve":
             self.solution = {"moves": payload.moves, "index": 0, "playing": True,
                              "start": self.view.state.copy(), "info": payload}
-            self.set_status("solution", n=len(payload.moves))
+            if payload.method == "net":
+                self.set_status("net_solution", n=len(payload.moves),
+                                nodes=f"{payload.nodes:,}".replace(",", " "), sec=f"{payload.seconds:.1f}")
+            else:
+                self.set_status("solution", n=len(payload.moves))
             self.show_thoughts(payload)
             self.step_timer.start(AI_PAUSE_MS)
 
@@ -680,6 +710,8 @@ class GameWidget(QWidget):
     def show_thoughts(self, sol):
         if isinstance(sol, Exception) or sol is None:
             return
+        if sol.method == "net":
+            return
         if sol.optimal:
             text = self.t("th_exact", n=len(sol))
         else:
@@ -687,5 +719,8 @@ class GameWidget(QWidget):
             found = " → ".join(str(x) for x in sol.found)
             text += "\n" + self.t("th_search", nodes=f"{sol.nodes:,}".replace(",", " "),
                                   sec=f"{sol.seconds:.2f}", found=found)
+        est = solvers.net_estimate(self.n, self.view.state)
+        if est is not None:
+            text += "\n" + self.t("th_net", n=f"{est:.1f}")
         self.thought_text = text
         self.refresh_texts()

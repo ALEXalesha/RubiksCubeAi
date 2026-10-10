@@ -289,3 +289,42 @@ def test_step_back_undoes_exactly_the_last_move(app, win):
     g.step_back()
     assert wait(app, lambda: not g.view.animating())
     assert (g.view.state == P3.apply(P3.solved(), "R U")).all()
+
+
+@pytest.fixture
+def tiny_net2():
+    from game.ai import net as N
+    from game.train import davi
+    t = davi.Trainer(None, n=2, hidden=(64,), batch=256, kmax=3, lr=3e-3, sync=25, seed=1, log=False)
+    t.train(400, eval_every=0, snapshot_every=0)
+    old = N._DEFAULT.get(2, "нет")
+    N._DEFAULT[2] = t.net
+    yield t.net
+    if old == "нет":
+        N._DEFAULT.pop(2, None)
+    else:
+        N._DEFAULT[2] = old
+
+
+def test_network_solver_in_the_window(app, win, tiny_net2, monkeypatch):
+    g = win.game
+    g.set_size(2)
+    assert g.solver_row.isVisible()
+    g.change("solver", "net")
+    g.view.set_state(C.Puzzle(2).apply(C.Puzzle(2).solved(), "R U' F2"))
+    g.ai_solve()
+    assert wait(app, lambda: g.solution is not None, 30), g.status.text()
+    assert g.solution["info"].method == "net"
+    assert wait(app, lambda: g.solution["index"] == len(g.solution["moves"]) and not g.view.animating(), 20)
+    assert g.view.pz.is_solved(g.view.state)
+    # предел поиска мал - сеть честно говорит, что не нашла
+    import game.ui.widget as W
+    monkeypatch.setattr(W, "NET_NODES", 1)
+    g.scramble(seed=9)
+    g.ai_solve()
+    assert wait(app, lambda: "~" in g.status.text(), 30), g.status.text()
+    assert g.solution is None
+    g.change("show_thoughts", True)
+    g.request_thoughts()
+    assert wait(app, lambda: RU["th_net"].split("~")[0] in g.thoughts_label.text(), 30)
+    g.change("solver", "kociemba")

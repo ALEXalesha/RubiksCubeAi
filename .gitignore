@@ -12,3 +12,4 @@ selftest*.txt
 *.tmp
 runs/
 .cache/
+runs_*.out

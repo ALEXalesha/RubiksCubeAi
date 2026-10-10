@@ -48,6 +48,11 @@ RU = {
     "th_none": "Для этого размера мыслей нет: решателя нет.",
     "th_wait": "Думаю…",
     "error": "Ошибка ИИ: {e}",
+    "solver": "Решатель", "kociemba": "Kociemba", "net": "Сеть",
+    "net_not_found": "Сеть не нашла решение: просмотрено {nodes} позиций, её оценка - ~{est} ходов. "
+                     "Kociemba соберёт точно.",
+    "th_net": "Сеть: осталось ~{n} ходов.",
+    "net_solution": "Решение сети: {n} ходов, просмотрено {nodes} позиций за {sec} с.",
     "keys": "Мышь: тянуть наклейку - повернуть слой, тянуть фон - вращать кубик. "
             "Клавиши: U D L R F B (Shift - обратный ход), M E S, X Y Z; Ctrl+Z - отменить.",
     "first": "⏮", "back": "◀", "play": "▶", "pause": "⏸", "forward": "▶▶",
@@ -102,6 +107,11 @@ EN = {
     "th_none": "No thoughts for this size: there is no solver.",
     "th_wait": "Thinking…",
     "error": "AI error: {e}",
+    "solver": "Solver", "kociemba": "Kociemba", "net": "Network",
+    "net_not_found": "The network found no solution: {nodes} positions searched, its estimate is ~{est} moves. "
+                     "Kociemba will solve it exactly.",
+    "th_net": "Network: ~{n} moves left.",
+    "net_solution": "Network solution: {n} moves, {nodes} positions searched in {sec} s.",
     "keys": "Mouse: drag a sticker to turn a layer, drag the background to rotate the cube. "
             "Keys: U D L R F B (Shift for the reverse turn), M E S, X Y Z; Ctrl+Z to undo.",
     "first": "⏮", "back": "◀", "play": "▶", "pause": "⏸", "forward": "▶▶",

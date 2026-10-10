@@ -105,3 +105,59 @@ class Brain:
         moves = [pz.name(m) for m in K.map_moves(r.names, rot)]
         return Solution(moves, "kociemba", nodes=r.nodes, seconds=r.seconds, estimate=estimate,
                         found=r.solutions)
+
+
+class NotFound(Exception):
+    """Сеть не нашла решения в пределах поиска (честный исход, не ошибка)."""
+
+    def __init__(self, nodes, estimate):
+        super().__init__(f"не найдено за {nodes} позиций")
+        self.nodes = nodes
+        self.estimate = estimate
+
+
+def _normalized(n, state):
+    """Развёртка в положении, в котором её видит сеть, и поворот к нему."""
+    if n == 3:
+        return K.normalize(state)
+    from game.ai import pocket as PK
+    return PK.normalize2(state)
+
+
+def has_net(n):
+    from game.ai.net import default_net
+    return n in (2, 3) and default_net(n) is not None
+
+
+def net_estimate(n, state):
+    """Оценка сети «ходов осталось» или None (сети нет, кубик невозможен)."""
+    from game.ai.net import default_net
+    net = default_net(n) if n in (2, 3) else None
+    if net is None or Brain.check(n, state):
+        return None
+    s, _ = _normalized(n, state)
+    return float(net.predict(s[None])[0])
+
+
+def net_solve(n, state, max_nodes=20_000, stop=None):
+    """Решение сетью и взвешенным A*: Solution или NotFound."""
+    from game.ai import astar
+    from game.ai import pocket as PK
+    from game.ai.net import default_net
+    net = default_net(n)
+    if net is None:
+        raise ValueError("сети нет")
+    reason = Brain.check(n, state)
+    if reason:
+        raise K.InvalidCube(reason)
+    pz = C.Puzzle(n)
+    s, rot = _normalized(n, state)
+    r = astar.solve(net, s, max_nodes=max_nodes, stop=stop)
+    if not r.solved:
+        if stop is not None and stop.is_set():
+            return None
+        raise NotFound(r.nodes, r.estimate)
+    names = [pz.name(m) for m in r.moves]
+    moves = [pz.name(m) for m in PK.map_face_moves(pz, names, rot)]
+    return Solution(moves, "net", nodes=r.nodes, seconds=r.seconds, estimate=round(r.estimate, 1),
+                    found=[len(moves)])
