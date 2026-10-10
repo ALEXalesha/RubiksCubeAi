@@ -24,7 +24,8 @@ def main(argv=None):
     ap.add_argument("--kmax", type=int)
     ap.add_argument("--hidden", default="512,512,256")
     ap.add_argument("--lr", type=float, default=1e-3)
-    ap.add_argument("--sync", type=int, default=500)
+    ap.add_argument("--sync", type=int, default=500, help="обновить цель не реже, чем раз в столько шагов")
+    ap.add_argument("--sync-loss", type=float, default=0.05, help="обновить цель, когда потеря ниже")
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--eval-every", type=int, default=1000)
     ap.add_argument("--resume", action="store_true")
@@ -44,7 +45,8 @@ def main(argv=None):
     if args.trial:
         import tempfile
         tmp = tempfile.mkdtemp(prefix=f"cube{args.size}-trial-")
-        t = Trainer(tmp, args.size, hidden, args.batch, args.kmax, args.lr, args.sync, log=False)
+        t = Trainer(tmp, args.size, hidden, args.batch, args.kmax, args.lr, args.sync, log=False,
+                    sync_loss=args.sync_loss)
         t.step()                                        # первый шаг - разогрев
         t0 = time.perf_counter()
         for _ in range(args.trial):
@@ -61,12 +63,13 @@ def main(argv=None):
                           "forecast_hours": round(total / 3600, 2), "trial_dir": tmp}, ensure_ascii=False))
         return 0
 
-    t = Trainer(run, args.size, hidden, args.batch, args.kmax, args.lr, args.sync)
+    t = Trainer(run, args.size, hidden, args.batch, args.kmax, args.lr, args.sync, sync_loss=args.sync_loss)
     if args.publish:
         if not t.load_snapshot():
             print("нет снимка", file=sys.stderr)
             return 1
         meta = {"size": args.size, "hidden": list(hidden), "steps": t.step_no, "batch": t.batch,
+                "syncs": t.syncs,
                 "kmax": t.kmax, "train_seconds": round(t.train_seconds), "history": t.history}
         t.net.save(model_path(args.size), meta)
         print(f"сеть шага {t.step_no} -> {model_path(args.size)}")

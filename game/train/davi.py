@@ -5,7 +5,11 @@
 2. цель для каждой: 0 у собранной, иначе 1 + min по ходам оценки соседа целевой сетью
    (собранный сосед - 0);
 3. шаг Adam по средней квадратичной ошибке.
-Целевая сеть - копия обучаемой, обновляется раз в sync шагов.
+Целевая сеть - копия обучаемой. Обновляется, как в DeepCubeA, когда обучаемая её догнала:
+средняя потеря за последние SYNC_CHECK шагов меньше sync_loss (но не реже раза в sync
+шагов). Без этого «волна» от собранного кубика растёт на один ход за обновление, и при
+редких обновлениях оценка упирается в потолок (замер 10.10: после 1000 шагов с sync=500
+оценка 3×3 стояла на ~2 хода для любой глубины).
 
 Снимок (веса обеих сетей, Adam, номер шага, журнал оценки) пишется атомарно каждые
 snapshot_every шагов и в конце; прерванное обучение продолжается с него.
@@ -52,14 +56,21 @@ def targets(target_net, states, perms):
     return y.astype(np.float32)
 
 
+SYNC_CHECK = 50
+
+
 class Trainer:
     def __init__(self, run, n=3, hidden=(512, 512, 256), batch=1000, kmax=None, lr=1e-3, sync=500,
-                 seed=0, log=True):
+                 seed=0, log=True, sync_loss=0.05):
         self.run = run
         self.n = n
         self.batch = batch
         self.kmax = kmax or {2: 14, 3: 30}.get(n, 30)
         self.sync = sync
+        self.sync_loss = sync_loss
+        self.last_sync = 0
+        self.syncs = 0
+        self.recent = []
         self.net = ValueNet(n, hidden, seed)
         self.target = ValueNet(n, hidden, seed)
         self.target.copy_from(self.net)
@@ -86,8 +97,14 @@ class Trainer:
         self.net.model.backward(grad[:, None])
         self.opt.step()
         self.step_no += 1
-        if self.step_no % self.sync == 0:
+        self.recent.append(loss)
+        gap = self.step_no - self.last_sync
+        if gap >= self.sync or (self.sync_loss and gap >= SYNC_CHECK and len(self.recent) >= SYNC_CHECK
+                                and float(np.mean(self.recent[-SYNC_CHECK:])) < self.sync_loss):
             self.target.copy_from(self.net)
+            self.last_sync = self.step_no
+            self.syncs += 1
+            self.recent = []
         self.train_seconds += time.perf_counter() - t0
         return loss
 
@@ -113,7 +130,8 @@ class Trainer:
             losses.append(self.step())
             if self.step_no % 50 == 0:
                 rate = (time.perf_counter() - started) / len(losses)
-                self.log(f"шаг {self.step_no}: потеря {np.mean(losses[-50:]):.3f}, {rate:.2f} с/шаг")
+                self.log(f"шаг {self.step_no}: потеря {np.mean(losses[-50:]):.3f}, {rate:.2f} с/шаг, "
+                         f"обновлений цели {self.syncs}")
             if eval_every and self.step_no % eval_every == 0:
                 ev = self.evaluate()
                 self.history.append({"step": self.step_no, "eval": ev})
@@ -134,6 +152,7 @@ class Trainer:
             arrays[f"adam.v.{i}"] = v
         meta = {"n": self.n, "hidden": list(self.net.hidden), "step": self.step_no, "adam_t": self.opt.t,
                 "batch": self.batch, "kmax": self.kmax, "sync": self.sync, "history": self.history,
+                "last_sync": self.last_sync, "syncs": self.syncs, "sync_loss": self.sync_loss,
                 "train_seconds": round(self.train_seconds, 1),
                 "rng": self.rng.bit_generator.state}
         save_snapshot(self.snapshot_path, arrays, meta)
@@ -151,6 +170,9 @@ class Trainer:
         self.opt.t = meta["adam_t"]
         self.step_no = meta["step"]
         self.history = meta.get("history", [])
+        self.last_sync = meta.get("last_sync", self.step_no)
+        self.syncs = meta.get("syncs", 0)
+        self.recent = []
         self.train_seconds = meta.get("train_seconds", 0.0)
         if "rng" in meta:
             self.rng.bit_generator.state = meta["rng"]
