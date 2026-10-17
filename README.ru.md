@@ -6,6 +6,9 @@
 
 ![ИИ собирает 3×3](docs/preview.png)
 
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+Код, тесты и документация этого проекта написаны Claude (Anthropic) в Claude Code. Идеи, проверка и решения - Алексей.
+
 В работе (0.1.0). Python, PySide6 и numpy, без pygame.
 
 ## Что уже есть

@@ -6,6 +6,9 @@
 
 ![The AI solving a 3×3 cube](docs/preview.png)
 
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+Code, tests and docs are written by Claude (Anthropic) in Claude Code. Ideas, testing and decisions - Alexey.
+
 Work in progress (0.1.0). Python, PySide6 and numpy; no pygame.
 
 ## What works
